@@ -101,4 +101,11 @@ valParser = optional (symbol "-")
 -- | Parse an infix operator1
 -- | Syntax: e1 OP e2
 operatorTable :: [[Operator Parser (Fix ExprF)]]
-operatorTable = [[InfixL (dot Fix (BinOpF BPlus) <$ symbol "+")]]
+operatorTable =
+  [ [ InfixL (dot Fix (BinOpF BMulti) <$ symbol "*")
+    , InfixL (dot Fix (BinOpF BDiv) <$ symbol "/")
+    ]
+  , [ InfixL (dot Fix (BinOpF BPlus) <$ symbol "+")
+    , InfixL (dot Fix (BinOpF BMinus) <$ symbol "-")
+    ]
+  ]

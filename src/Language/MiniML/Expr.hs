@@ -29,7 +29,7 @@ data ExprF r
   | BinOpF BinOp r r
   deriving (Functor, Show, Foldable, Traversable)
 
-data BinOp = BPlus
+data BinOp = BPlus | BMinus | BMulti | BDiv
   deriving (Show)
 
 deriveShow1 ''ExprF
@@ -51,4 +51,8 @@ instance Pretty Value where
   pretty = pretty . unValue
 
 instance Pretty BinOp where
-  pretty BPlus = pretty " + "
+  pretty = pretty . \case
+      BPlus  -> " + "
+      BMinus -> " - "
+      BMulti -> " * "
+      BDiv   -> " / "

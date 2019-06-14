@@ -29,5 +29,11 @@ eval = cata alg
       _        -> VClosure $ Fix $ AppF e1 (unValue v2)
     ValF i -> VClosure $ Fix $ ValF i
     BinOpF op (VClosure e1) (VClosure e2) -> case (unfix e1, unfix e2) of
-      (ValF i1, ValF i2) -> VClosure $ Fix $ ValF $ i1 + i2
-      (_      , _      ) -> VClosure $ Fix $ BinOpF BPlus e1 e2
+      (ValF i1, ValF i2) -> VClosure $ Fix $ ValF $ (opToFun op) i1 i2
+      (_      , _      ) -> VClosure $ Fix $ BinOpF op e1 e2
+
+  opToFun = \case
+    BPlus  -> (+)
+    BMinus -> subtract
+    BMulti -> (*)
+    BDiv   -> div
