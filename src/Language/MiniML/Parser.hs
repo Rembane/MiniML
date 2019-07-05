@@ -1,18 +1,23 @@
+{-# LANGUAGE RankNTypes #-}
 module Language.MiniML.Parser where
 
 import           Control.Applicative                      ( liftA2 )
 import           Control.Monad.Combinators.Expr           ( Operator(..)
                                                           , makeExprParser
                                                           )
+import           Control.Monad.State.Strict               ( State )
 import           Data.Foldable                            ( foldl' )
 import           Data.Functor                             ( (<&>) )
 import           Data.Functor.Foldable                    ( Fix(Fix) )
 import           Data.Text                                ( Text )
 import qualified Data.Text                     as T
+import qualified Data.Map                      as M
 import           Data.Void                                ( Void )
+import           Prelude                           hiding ( abs )
 import           Text.Megaparsec                          ( (<|>)
                                                           , (<?>)
                                                           , Parsec
+                                                          , ParsecT
                                                           , ParseErrorBundle
                                                           , between
                                                           , choice
@@ -36,15 +41,17 @@ import           Language.MiniML.Expr
 -- https://markkarpov.com/megaparsec/parsing-simple-imperative-language.html
 -- and https://markkarpov.com/megaparsec/megaparsec.html
 
-dot = (.) . (.)
-
 type Parser = Parsec Void Text
 
 -- | Filename -> Content of file -> Result
-parseMiniML :: String -> Text -> Either (ParseErrorBundle Text Void) (Fix ExprF)
+parseMiniML
+  :: Symantics repr
+  => String
+  -> Text
+  -> Either (ParseErrorBundle Text Void) (Parser (repr (a -> b)))
 parseMiniML = parse minimlParser
 
-minimlParser :: Parser (Fix ExprF)
+minimlParser :: Symantics repr => Parser (repr (a -> b))
 minimlParser = between sc eof exprParser
 
 sc :: Parser ()
@@ -58,54 +65,51 @@ lexeme = L.lexeme sc
 symbol :: String -> Parser Text
 symbol = L.symbol sc . T.pack
 
-parens :: Show a => Parser a -> Parser a
+parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
-exprParser :: Parser (Fix ExprF)
+exprParser :: Symantics repr => Parser (repr Int)
 exprParser =
-  (makeExprParser noOperatorParsers operatorTable <?> "operators")
+  (makeExprParser noOperatorParsers (operatorTable) <?> "operators")
     <|> noOperatorParsers
- where
-  noOperatorParsers =
-    choice [absParser, appParser, valParser, fixVarParser, parens exprParser]
+  where noOperatorParsers = choice [appParser, valParser, parens exprParser]
 
 -- | Variables start with a-z or _ and is then followed by alphanumeric characters, _ and '
 varParser :: Parser Var
 varParser = Var <$> (lexeme . try)
   (liftA2 (:) (char '_' <|> lowerChar) (many (char '\'' <|> alphaNumChar)))
 
--- | Lift a Var into Fix ExprF
-fixVarParser :: Parser (Fix ExprF)
-fixVarParser = Fix . VarF <$> varParser
-
 -- | Parse a lambda abstraction
 -- | Syntax: \var -> expr
-absParser :: Parser (Fix ExprF)
-absParser =
-  symbol "\\" *> liftA2 (dot Fix AbsF) varParser (symbol "->" *> exprParser)
+--  lam :: (Var, repr a -> repr b) -> repr (a -> b)
+lamParser :: Symantics repr => Parser (repr (a -> b))
+lamParser = symbol "\\" *> liftA2 (\v e -> lam (v, \x -> (app e) x))
+                                  varParser
+                                  (symbol "->" *> exprParser)
 
 -- | Parse an expression application
 -- | Syntax: e1 e2 [e3 ... e_n]
-appParser :: Parser (Fix ExprF)
-appParser = try $ liftA2
-  (foldl' (dot Fix AppF))
-  (let p = absParser <|> fixVarParser in p <|> parens p)
+-- app :: repr (a -> b) -> repr a -> repr b
+appParser :: Symantics repr => Parser (repr Int)
+appParser = undefined {- try $ liftA2
+  (\f es -> foldl' (\acc x -> _) _ es)
+  (let p = lamParser <|> ((\v -> \e -> lam (v, \x -> e)) <$> varParser)
+   in  p <|> parens p
+  )
   (some exprParser)
+  -}
 
 -- | Parse a value
 -- | Syntax: Optional minus sign, integer literal.
-valParser :: Parser (Fix ExprF)
-valParser = optional (symbol "-")
-  >>= \f -> lexeme L.decimal <&> (Fix . ValF . maybe id (const negate) f)
+valParser :: (Symantics repr) => Parser (repr Int)
+valParser = undefined {- optional (symbol "-")
+  >>= \f -> lexeme L.decimal <&> (const (val . maybe id (const negate) f))
+  -}
 
 -- | Parse an infix operator1
 -- | Syntax: e1 OP e2
-operatorTable :: [[Operator Parser (Fix ExprF)]]
+operatorTable :: Symantics repr => [[Operator Parser (repr Int)]]
 operatorTable =
-  [ [ InfixL (dot Fix (BinOpF BMulti) <$ symbol "*")
-    , InfixL (dot Fix (BinOpF BDiv) <$ symbol "/")
-    ]
-  , [ InfixL (dot Fix (BinOpF BPlus) <$ symbol "+")
-    , InfixL (dot Fix (BinOpF BMinus) <$ symbol "-")
-    ]
+  [ [InfixL (multi <$ symbol "*"), InfixL (divis <$ symbol "/")]
+  , [InfixL (plus <$ symbol "+"), InfixL (minus <$ symbol "-")]
   ]

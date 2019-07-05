@@ -8,6 +8,23 @@ import           Data.Functor.Foldable                    ( Fix(Fix)
 
 import           Language.MiniML.Expr
 
+-- | For evaluation
+newtype E a = E { unE :: a }
+
+instance Symantics E where
+  val = E
+  plus  (E e1) (E e2) = E $ e1 + e2
+
+  minus (E e1) (E e2) = E $ e1 - e2
+  multi (E e1) (E e2) = E $ e1 * e2
+  divis (E e1) (E e2) = E $ e1 `div` e2
+
+  lam (_, f) = E $ unE . f . E
+  app e1 e2  = E $ (unE e1) (unE e2)
+
+eval' :: E a -> a
+eval' = unE
+
 -- | Substitute a variable with an expression
 substitute :: Var -> Fix ExprF -> Fix ExprF -> Fix ExprF
 substitute v replaceInThis withThat = cata alg replaceInThis

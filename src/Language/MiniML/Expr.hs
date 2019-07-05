@@ -1,21 +1,40 @@
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable, FlexibleInstances,
    LambdaCase, TemplateHaskell #-}
 
+-- | Inspiration: Tagless Final
+-- | - http://okmij.org/ftp/tagless-final/course/lecture.pdf
+
 module Language.MiniML.Expr
-  ( BinOp(..)
+  ( Symantics(..)
+  , BinOp(..)
   , ExprF(..)
   , Value(..)
   , Var(..)
+  , P(..)
+  , view
   )
 where
 
+import           Control.Monad
+import           Data.Function                            ( on )
 import           Data.Functor.Foldable                    ( Fix
                                                           , cata
                                                           )
-import           Data.Text.Prettyprint.Doc                ( Pretty
+import           Data.Text.Prettyprint.Doc                ( Doc
+                                                          , Pretty
                                                           , pretty
                                                           )
-import           Text.Show.Deriving
+
+class Symantics repr where
+  val :: Int -> repr Int
+--  var :: Var -> repr Var
+  plus  :: repr Int -> repr Int -> repr Int
+  minus :: repr Int -> repr Int -> repr Int
+  multi :: repr Int -> repr Int -> repr Int
+  divis :: repr Int -> repr Int -> repr Int
+
+  lam :: (Var, repr a -> repr b) -> repr (a -> b)
+  app :: repr (a -> b) -> repr a -> repr b
 
 newtype Var
   = Var { unVar :: String }
@@ -32,7 +51,21 @@ data ExprF r
 data BinOp = BPlus | BMinus | BMulti | BDiv
   deriving (Show)
 
-deriveShow1 ''ExprF
+-- | For prettyprinting.
+newtype P a = P { unP :: String }
+
+instance Symantics P where
+  val = P . show
+  plus  e1 e2 = P $ unP e1 <> " + " <> unP e2
+  minus e1 e2 = P $ unP e1 <> " - " <> unP e2
+  multi e1 e2 = P $ unP e1 <> " * " <> unP e2
+  divis e1 e2 = P $ unP e1 <> " / " <> unP e2
+
+  lam (v, e) = P $ "(λ" <> unVar v <> ". " <> unP (e $ P $ unVar v) <> ")"
+  app e1 e2 = P $ "(" <> unP e1 <> " " <> unP e2 <> ")"
+
+view :: P a -> String
+view = unP
 
 instance Pretty (Fix ExprF) where
   pretty = cata alg

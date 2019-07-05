@@ -16,7 +16,7 @@ import           Language.MiniML
 import           Language.MiniML.Parser
 
 main :: IO ()
-main = getArgs >>= \case
+main = undefined {- getArgs >>= \case
   (fn : _) ->
     (   B.readFile fn
       >>= ( putDocW 80
@@ -28,3 +28,5 @@ main = getArgs >>= \case
       )
       *> putStrLn ""
   _ -> putStrLn "Please supply a filename.\n\nUsage: ./MiniML <filename.min>\n"
+  -}
+            
