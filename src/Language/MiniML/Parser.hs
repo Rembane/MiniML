@@ -36,6 +36,7 @@ import           Language.MiniML.Expr
 -- https://markkarpov.com/megaparsec/parsing-simple-imperative-language.html
 -- and https://markkarpov.com/megaparsec/megaparsec.html
 
+dot :: (b -> c) -> (a1 -> a2 -> b) -> a1 -> a2 -> c
 dot = (.) . (.)
 
 type Parser = Parsec Void Text
